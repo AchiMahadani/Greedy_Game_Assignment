@@ -1,0 +1,43 @@
+CREATE TABLE high_val_txn (
+    adv_id VARCHAR(100),  
+    value_in_paise BIGINT,  
+    payment_gateway VARCHAR(100),
+    payment_method VARCHAR(100),
+    payment_status VARCHAR(50),
+    created_at TIMESTAMP,  
+    app_id VARCHAR(100),  
+    from_currency_amount DECIMAL(18,2),
+    from_currency VARCHAR(50),
+    to_currency_amount DECIMAL(18,2),
+    to_currency VARCHAR(50),
+    transaction_fee_amount DECIMAL(18,2),
+    transaction_fee_currency VARCHAR(50)
+);
+
+Select * 
+	from 
+high_val_txn
+
+
+
+WITH ordered_txns AS (
+  SELECT
+    adv_id,
+    created_at,
+    value_in_paise,
+    LAG(value_in_paise, 1) OVER (PARTITION BY adv_id ORDER BY created_at) AS prev1,
+    LAG(value_in_paise, 2) OVER (PARTITION BY adv_id ORDER BY created_at) AS prev2,
+    LAG(value_in_paise, 3) OVER (PARTITION BY adv_id ORDER BY created_at) AS prev3
+  FROM high_val_txn
+  WHERE adv_id IS NOT NULL AND adv_id <> ''
+),
+avg_calc AS (
+  SELECT *,
+         (prev1 + prev2 + prev3) / 3.0 AS avg_last_3_value
+  FROM ordered_txns
+  WHERE prev1 IS NOT NULL AND prev2 IS NOT NULL AND prev3 IS NOT NULL
+)
+SELECT *
+FROM avg_calc
+WHERE value_in_paise >= 2 * avg_last_3_value
+ORDER BY adv_id, created_at;
